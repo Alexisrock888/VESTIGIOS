@@ -92,6 +92,8 @@ function App() {
   const [activeDesigner, setActiveDesigner] = useState(null)
   const [designerError, setDesignerError] = useState('')
   const [designerNotificationsOpen, setDesignerNotificationsOpen] = useState(false)
+  const [designerAddFormOpen, setDesignerAddFormOpen] = useState(false)
+  const [designerAddError, setDesignerAddError] = useState('')
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0)
 
   useEffect(() => {
@@ -110,6 +112,20 @@ function App() {
       window.removeEventListener('keydown', closeOnEscape)
     }
   }, [cartOpen, designerPortalOpen])
+
+  useEffect(() => {
+    if (!designerPortalOpen || designerView !== 'login') return undefined
+    const logDemoCredentials = () => console.info('[VESTIGIOS] Acceso demo de diseñadora', {
+      usuario: demoDesignerAccount.email,
+      contraseña: demoDesignerAccount.password,
+    })
+    const showCredentialsOnF12 = (event) => {
+      if (event.key === 'F12') logDemoCredentials()
+    }
+    logDemoCredentials()
+    window.addEventListener('keydown', showCredentialsOnF12)
+    return () => window.removeEventListener('keydown', showCredentialsOnF12)
+  }, [designerPortalOpen, designerView])
 
   const filteredProducts = useMemo(() => products.filter((product) => {
     const categoryMatch = activeCategory === 'Todo' || product.category === activeCategory
@@ -194,6 +210,41 @@ function App() {
     setDesignerError('')
     setDesignerNotificationsOpen(false)
     setDesignerView('dashboard')
+  }
+  const addDesignerDesign = (event) => {
+    event.preventDefault()
+    if (!activeDesigner) return
+    const formElement = event.currentTarget
+    const formData = new FormData(event.currentTarget)
+    const imageFile = formData.get('image')
+    if (!imageFile || imageFile.size === 0) {
+      setDesignerAddError('Selecciona una foto para el diseño.')
+      return
+    }
+    if (imageFile.size > 5 * 1024 * 1024) {
+      setDesignerAddError('La foto debe pesar menos de 5 MB.')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      const design = {
+        id: `design-${Date.now()}`,
+        name: formData.get('title').trim(),
+        description: formData.get('description').trim(),
+        designer: activeDesigner.name,
+        category: 'Diseño de autor',
+        tag: 'Diseño de autor',
+        image: reader.result,
+      }
+      const updatedDesigner = { ...activeDesigner, collection: [...activeDesigner.collection, design] }
+      setActiveDesigner(updatedDesigner)
+      setDesignerAccounts((accounts) => accounts.map((account) => account.id === updatedDesigner.id ? updatedDesigner : account))
+      setDesignerAddFormOpen(false)
+      setDesignerAddError('')
+      formElement.reset()
+    }
+    reader.onerror = () => setDesignerAddError('No se pudo leer la foto. Intenta con otro archivo.')
+    reader.readAsDataURL(imageFile)
   }
 
   return (
@@ -314,12 +365,13 @@ function App() {
 
           {designerView === 'dashboard' && activeDesigner ? <div className="designer-dashboard">
             <div className="designer-profile-summary"><div className="designer-avatar">{activeDesigner.name.charAt(0)}</div><div><span className="eyebrow">{activeDesigner.brand}</span><h3>{activeDesigner.name}</h3><p>{activeDesigner.municipality}, {activeDesigner.country} · {activeDesigner.email} · {activeDesigner.phone}</p></div><button className="designer-notification-button" aria-label={`Ver ${activeDesigner.notifications?.length ?? 0} notificaciones`} aria-expanded={designerNotificationsOpen} aria-controls="designer-notifications" onClick={() => setDesignerNotificationsOpen((isOpen) => !isOpen)}><Icon name="bell" size={20} />{(activeDesigner.notifications?.length ?? 0) > 0 && <span>{activeDesigner.notifications.length}</span>}</button><button className="designer-logout" onClick={() => { setActiveDesigner(null); setDesignerNotificationsOpen(false); setDesignerView('login') }}>Cerrar sesión</button></div>
-            {designerNotificationsOpen && <section className="designer-notification-panel" id="designer-notifications" aria-label="Notificaciones de interés en tus diseños"><div className="designer-notification-heading"><div><span className="eyebrow">ACTIVIDAD DE TU COLECCIÓN</span><h3>Personas interesadas</h3></div><span className="designer-notification-total">{activeDesigner.notifications?.length ?? 0}</span></div>{activeDesigner.notifications?.length ? <><ul>{activeDesigner.notifications.map((notification) => {
+            {designerNotificationsOpen && <section className="designer-notification-panel" id="designer-notifications" aria-label="Notificaciones de interés en tus diseños"><div className="designer-notification-heading"><div><span className="eyebrow">ACTIVIDAD DE TU COLECCIÓN</span><h3>Personas interesadas</h3></div><span className="designer-notification-total">{activeDesigner.notifications?.length ?? 0}</span></div>{activeDesigner.notifications?.length ? <ul>{activeDesigner.notifications.map((notification) => {
               const product = activeDesigner.collection.find((item) => item.id === notification.productId)
               return <li className="designer-notification-item" key={notification.id}><span className="designer-notification-avatar">{notification.person.split(' ').map((part) => part[0]).slice(0, 2).join('')}</span><p><strong>{notification.person}</strong> · {notification.municipality}<br /><span>Está interesada en <b>{product?.name ?? 'uno de tus diseños'}</b></span></p><time>{notification.when}</time></li>
-            })}</ul><p className="designer-notification-disclaimer">Notificaciones de ejemplo con datos simulados.</p></> : <p className="designer-notification-empty">Todavía no hay personas interesadas en tus diseños.</p>}</section>}
-            <div className="designer-dashboard-heading"><div><span className="eyebrow">TU ESPACIO</span><h3>Mi colección <span>{activeDesigner.collection.length}</span></h3></div><p>Esta es la colección asociada a tu cuenta de diseñadora.</p></div>
-            {activeDesigner.collection.length > 0 ? <div className="designer-collection-grid">{activeDesigner.collection.map((product) => <article className="designer-piece" key={product.id}><img src={product.image} alt={product.name} /><div><span>{product.category}</span><h4>{product.name}</h4></div></article>)}</div> : <div className="designer-empty-collection"><span>✳</span><h3>Tu colección está lista para comenzar.</h3><p>Las piezas que agregues a tu cuenta aparecerán aquí. Por ahora, este espacio funciona como una demostración visual.</p></div>}
+            })}</ul> : <p className="designer-notification-empty">Todavía no hay personas interesadas en tus diseños.</p>}</section>}
+            <div className="designer-dashboard-heading"><div><span className="eyebrow">TU ESPACIO</span><h3>Mi colección <span>{activeDesigner.collection.length}</span></h3></div><p>Esta es la colección asociada a tu cuenta de diseñadora.</p><button className="button button-dark designer-add-button" onClick={() => { setDesignerAddError(''); setDesignerAddFormOpen((isOpen) => !isOpen) }}>{designerAddFormOpen ? 'Cancelar' : 'Agregar diseño'}</button></div>
+            {designerAddFormOpen && <form className="designer-add-form" onSubmit={addDesignerDesign}><div className="designer-add-form-heading"><span className="eyebrow">NUEVA PIEZA</span><h3>Agrega un diseño a tu colección</h3></div><div className="designer-add-form-grid"><label>Título del diseño<input name="title" maxLength="80" placeholder="Ej. Vestido Aurora" required /></label><label className="designer-design-photo">Foto del diseño<input name="image" type="file" accept="image/*" required /></label><label className="designer-design-description">Descripción<textarea name="description" rows="4" maxLength="500" placeholder="Cuéntanos la historia y los detalles de esta pieza" required /></label></div><p className="designer-add-help">La imagen debe pesar menos de 5 MB. En esta demo, los diseños añadidos se conservan solo mientras la página esté abierta.</p>{designerAddError && <p className="designer-form-error" role="alert">{designerAddError}</p>}<button className="button button-dark designer-submit" type="submit">Guardar diseño <Icon name="arrow" size={16} /></button></form>}
+            {activeDesigner.collection.length > 0 ? <div className="designer-collection-grid">{activeDesigner.collection.map((product) => <article className="designer-piece" key={product.id}><img src={product.image} alt={product.name} /><div><span>{product.category}</span><h4>{product.name}</h4>{product.description && <p>{product.description}</p>}</div></article>)}</div> : <div className="designer-empty-collection"><span>✳</span><h3>Tu colección está lista para comenzar.</h3><p>Las piezas que agregues a tu cuenta aparecerán aquí. Por ahora, este espacio funciona como una demostración visual.</p></div>}
           </div> : designerView === 'register' ? <form className="designer-form" onSubmit={registerDesigner}>
             <p className="designer-country-notice"><strong>Disponibilidad actual: Colombia.</strong> Por ahora recibimos registros únicamente de diseñadores que estén en Colombia.</p>
             <div className="designer-form-grid">
