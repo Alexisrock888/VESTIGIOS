@@ -33,6 +33,17 @@ const products = createCollection(collectionImageFiles, 'pieza').filter(
   (product) => product.name !== 'Diseño de autor 04',
 )
 const dressProducts = createCollection(dressImageFiles, 'vestido')
+const demoDesignerAccount = {
+  id: 'demo-yilian',
+  name: designerName,
+  brand: 'VESTIGIOS Estudio',
+  country: 'Colombia',
+  municipality: 'Bogotá',
+  email: 'disenadora@vestigios.co',
+  phone: '+57 300 123 4567',
+  password: 'Vestigios2025!',
+  collection: [...products, ...dressProducts],
+}
 
 const categories = [
   { name: 'Colección', count: `${products.length} piezas de autor`, src: products[0]?.image, href: '#coleccion' },
@@ -69,13 +80,21 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const [notice, setNotice] = useState('')
+  const [designerPortalOpen, setDesignerPortalOpen] = useState(false)
+  const [designerView, setDesignerView] = useState('login')
+  const [designerAccounts, setDesignerAccounts] = useState([demoDesignerAccount])
+  const [activeDesigner, setActiveDesigner] = useState(null)
+  const [designerError, setDesignerError] = useState('')
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0)
 
   useEffect(() => {
-    if (!cartOpen) return undefined
+    if (!cartOpen && !designerPortalOpen) return undefined
     const previousOverflow = document.body.style.overflow
     const closeOnEscape = (event) => {
-      if (event.key === 'Escape') setCartOpen(false)
+      if (event.key === 'Escape') {
+        setCartOpen(false)
+        setDesignerPortalOpen(false)
+      }
     }
     document.body.style.overflow = 'hidden'
     window.addEventListener('keydown', closeOnEscape)
@@ -83,7 +102,7 @@ function App() {
       document.body.style.overflow = previousOverflow
       window.removeEventListener('keydown', closeOnEscape)
     }
-  }, [cartOpen])
+  }, [cartOpen, designerPortalOpen])
 
   const filteredProducts = useMemo(() => products.filter((product) => {
     const categoryMatch = activeCategory === 'Todo' || product.category === activeCategory
@@ -123,6 +142,49 @@ function App() {
     item.product.id === productId ? { ...item, quantity: Math.max(1, item.quantity + change) } : item
   )))
   const removeFromCart = (productId) => setCartItems((items) => items.filter((item) => item.product.id !== productId))
+  const openDesignerPortal = (view) => {
+    setDesignerError('')
+    setDesignerView(view)
+    setDesignerPortalOpen(true)
+  }
+  const loginDesigner = (event) => {
+    event.preventDefault()
+    const formData = new FormData(event.currentTarget)
+    const email = formData.get('email').trim().toLowerCase()
+    const password = formData.get('password')
+    const account = designerAccounts.find((designer) => designer.email.toLowerCase() === email && designer.password === password)
+    if (!account) {
+      setDesignerError('No encontramos una cuenta con esos datos. Revisa tu correo y contraseña.')
+      return
+    }
+    setActiveDesigner(account)
+    setDesignerError('')
+    setDesignerView('dashboard')
+  }
+  const registerDesigner = (event) => {
+    event.preventDefault()
+    const formData = new FormData(event.currentTarget)
+    const email = formData.get('email').trim().toLowerCase()
+    if (designerAccounts.some((designer) => designer.email.toLowerCase() === email)) {
+      setDesignerError('Ya existe una cuenta con ese correo. Inicia sesión para continuar.')
+      return
+    }
+    const account = {
+      id: `designer-${Date.now()}`,
+      name: formData.get('name').trim(),
+      brand: formData.get('brand').trim(),
+      country: 'Colombia',
+      municipality: formData.get('municipality').trim(),
+      email,
+      phone: formData.get('phone').trim(),
+      password: formData.get('password'),
+      collection: [],
+    }
+    setDesignerAccounts((accounts) => [...accounts, account])
+    setActiveDesigner(account)
+    setDesignerError('')
+    setDesignerView('dashboard')
+  }
 
   return (
     <>
@@ -210,7 +272,7 @@ function App() {
 
         <section className="designer-feature" id="disenadores">
           <div className="designer-image"><Photo id="photo-1529139574466-a303027c1d8b" alt="Diseñadora colombiana en su estudio creativo" /></div>
-          <div className="designer-copy"><span className="eyebrow">MÁS QUE UNA ETIQUETA</span><h2>Detrás de cada pieza,<br />hay una <em>persona.</em></h2><p>Personas que imaginan, prueban, descosen y vuelven a empezar. Conoce las historias y los talleres que le dan sentido a lo que llevas puesto.</p><a className="button button-dark" href="#creadores">Conoce a nuestros creadores <Icon name="arrow" size={16} /></a><div className="designer-signature"><span>Hecho por manos inquietas</span><i>V.</i></div></div>
+          <div className="designer-copy"><span className="eyebrow">MÁS QUE UNA ETIQUETA</span><h2>Detrás de cada pieza,<br />hay una <em>persona.</em></h2><p>Personas que imaginan, prueban, descosen y vuelven a empezar. Conoce las historias y los talleres que le dan sentido a lo que llevas puesto.</p><div className="designer-actions"><button className="button button-dark" onClick={() => openDesignerPortal('register')}>Registrarse como diseñador <Icon name="arrow" size={16} /></button><button className="designer-login-link" onClick={() => openDesignerPortal(activeDesigner ? 'dashboard' : 'login')}>Ya tengo cuenta</button></div><div className="designer-signature"><span>Hecho por manos inquietas</span><i>V.</i></div></div>
         </section>
 
         <section className="manifesto" id="historia">
@@ -232,6 +294,45 @@ function App() {
           <form onSubmit={(event) => { event.preventDefault(); setNotice('¡Listo! Te escribiremos con buenas historias.'); event.currentTarget.reset(); window.setTimeout(() => setNotice(''), 3000) }}><label htmlFor="email">Tu correo electrónico</label><div className="email-field"><input id="email" type="email" placeholder="hola@tucorreo.com" required /><button type="submit" aria-label="Suscribirme"><Icon name="arrow" /></button></div><small>Al suscribirte aceptas recibir novedades de VESTIGIOS.</small></form>
         </section>
       </main>
+
+      {designerPortalOpen && <div className="cart-backdrop designer-portal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setDesignerPortalOpen(false) }}>
+        <section className="designer-portal" role="dialog" aria-modal="true" aria-labelledby="designer-portal-title">
+          <div className="designer-portal-header">
+            <div><span className="eyebrow">ESPACIO DE DISEÑADORES</span><h2 id="designer-portal-title">{designerView === 'dashboard' ? `Hola, ${activeDesigner?.name.split(' ')[0]}` : designerView === 'register' ? 'Tu historia también merece un espacio.' : 'Entra a tu estudio.'}</h2></div>
+            <button className="icon-button" aria-label="Cerrar" onClick={() => setDesignerPortalOpen(false)}><Icon name="close" /></button>
+          </div>
+
+          {designerView === 'dashboard' && activeDesigner ? <div className="designer-dashboard">
+            <div className="designer-profile-summary"><div className="designer-avatar">{activeDesigner.name.charAt(0)}</div><div><span className="eyebrow">{activeDesigner.brand}</span><h3>{activeDesigner.name}</h3><p>{activeDesigner.municipality}, {activeDesigner.country} · {activeDesigner.email} · {activeDesigner.phone}</p></div><button className="designer-logout" onClick={() => { setActiveDesigner(null); setDesignerView('login') }}>Cerrar sesión</button></div>
+            <div className="designer-dashboard-heading"><div><span className="eyebrow">TU ESPACIO</span><h3>Mi colección <span>{activeDesigner.collection.length}</span></h3></div><p>Esta es la colección asociada a tu cuenta de diseñadora.</p></div>
+            {activeDesigner.collection.length > 0 ? <div className="designer-collection-grid">{activeDesigner.collection.map((product) => <article className="designer-piece" key={product.id}><img src={product.image} alt={product.name} /><div><span>{product.category}</span><h4>{product.name}</h4></div></article>)}</div> : <div className="designer-empty-collection"><span>✳</span><h3>Tu colección está lista para comenzar.</h3><p>Las piezas que agregues a tu cuenta aparecerán aquí. Por ahora, este espacio funciona como una demostración visual.</p></div>}
+          </div> : designerView === 'register' ? <form className="designer-form" onSubmit={registerDesigner}>
+            <p className="designer-country-notice"><strong>Disponibilidad actual: Colombia.</strong> Por ahora recibimos registros únicamente de diseñadores que estén en Colombia.</p>
+            <div className="designer-form-grid">
+              <label>Nombre completo<input name="name" autoComplete="name" placeholder="Tu nombre" required /></label>
+              <label>Nombre de marca o taller<input name="brand" placeholder="Tu marca" required /></label>
+              <label>País<select name="country" value="Colombia" disabled><option>Colombia</option></select></label>
+              <label>Municipio<input name="municipality" placeholder="Ej. Bogotá" autoComplete="address-level2" required /></label>
+              <label>Correo electrónico<input name="email" type="email" autoComplete="email" placeholder="tu@correo.com" required /></label>
+              <label>Celular<input name="phone" type="tel" autoComplete="tel" placeholder="+57 300 000 0000" required /></label>
+              <label className="designer-password-field">Contraseña<input name="password" type="password" autoComplete="new-password" minLength="8" placeholder="Mínimo 8 caracteres" required /></label>
+            </div>
+            {designerError && <p className="designer-form-error" role="alert">{designerError}</p>}
+            <button className="button button-dark designer-submit" type="submit">Crear cuenta de diseñadora <Icon name="arrow" size={16} /></button>
+            <p className="designer-form-switch">¿Ya tienes cuenta? <button type="button" onClick={() => { setDesignerError(''); setDesignerView('login') }}>Inicia sesión</button></p>
+          </form> : <div className="designer-auth-grid">
+            <form className="designer-form designer-login-form" onSubmit={loginDesigner}>
+              <p>Inicia sesión para ver la colección asociada a tu cuenta.</p>
+              <label>Correo electrónico<input name="email" type="email" autoComplete="username" placeholder="tu@correo.com" required /></label>
+              <label>Contraseña<input name="password" type="password" autoComplete="current-password" placeholder="Tu contraseña" required /></label>
+              {designerError && <p className="designer-form-error" role="alert">{designerError}</p>}
+              <button className="button button-dark designer-submit" type="submit">Ingresar a mi colección <Icon name="arrow" size={16} /></button>
+              <p className="designer-form-switch">¿Aún no tienes cuenta? <button type="button" onClick={() => { setDesignerError(''); setDesignerView('register') }}>Regístrate como diseñador</button></p>
+            </form>
+            <aside className="designer-demo-account"><span className="eyebrow">CUENTA DE DEMOSTRACIÓN</span><h3>Prueba el espacio de diseñadora</h3><p>Entra con esta cuenta hardcodeada para ver una colección de ejemplo.</p><dl><div><dt>Correo</dt><dd>disenadora@vestigios.co</dd></div><div><dt>Contraseña</dt><dd>Vestigios2025!</dd></div></dl><button className="button button-outline" onClick={() => { setActiveDesigner(demoDesignerAccount); setDesignerError(''); setDesignerView('dashboard') }}>Entrar a la cuenta demo <Icon name="arrow" size={16} /></button></aside>
+          </div>}
+        </section>
+      </div>}
 
       {cartOpen && <div className="cart-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setCartOpen(false) }}>
         <aside className="cart-drawer" role="dialog" aria-modal="true" aria-labelledby="cart-title">
