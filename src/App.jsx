@@ -39,10 +39,15 @@ const demoDesignerAccount = {
   brand: 'VESTIGIOS Estudio',
   country: 'Colombia',
   municipality: 'Bogotá',
-  email: 'disenadora@vestigios.co',
-  phone: '+57 300 123 4567',
+  email: 'yilian.perez@cun.edu.co',
+  phone: '+57 301 558 5867',
   password: 'Vestigios2025!',
   collection: [...products, ...dressProducts],
+  notifications: [
+    { id: 'interest-1', person: 'Mariana López', municipality: 'Bogotá', productId: products[0]?.id, when: 'Hace 8 min' },
+    { id: 'interest-2', person: 'Valentina Rojas', municipality: 'Cali', productId: dressProducts[0]?.id, when: 'Hace 1 h' },
+    { id: 'interest-3', person: 'Camila Restrepo', municipality: 'Medellín', productId: products[1]?.id, when: 'Ayer' },
+  ],
 }
 
 const categories = [
@@ -61,6 +66,7 @@ function Icon({ name, size = 20, ...props }) {
     menu: <><path d="M4 7h16M4 12h16M4 17h16"/></>,
     close: <><path d="m6 6 12 12M18 6 6 18"/></>,
     pin: <><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></>,
+    bell: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></>,
     leaf: <><path d="M20 4c-8 0-14 3-14 10a6 6 0 0 0 6 6c7 0 10-7 8-16Z"/><path d="M4 21c3-5 7-8 12-11"/></>,
     instagram: <><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><path d="M17.5 6.5h.01"/></>,
   }
@@ -85,6 +91,7 @@ function App() {
   const [designerAccounts, setDesignerAccounts] = useState([demoDesignerAccount])
   const [activeDesigner, setActiveDesigner] = useState(null)
   const [designerError, setDesignerError] = useState('')
+  const [designerNotificationsOpen, setDesignerNotificationsOpen] = useState(false)
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0)
 
   useEffect(() => {
@@ -159,6 +166,7 @@ function App() {
     }
     setActiveDesigner(account)
     setDesignerError('')
+    setDesignerNotificationsOpen(false)
     setDesignerView('dashboard')
   }
   const registerDesigner = (event) => {
@@ -179,10 +187,12 @@ function App() {
       phone: formData.get('phone').trim(),
       password: formData.get('password'),
       collection: [],
+      notifications: [],
     }
     setDesignerAccounts((accounts) => [...accounts, account])
     setActiveDesigner(account)
     setDesignerError('')
+    setDesignerNotificationsOpen(false)
     setDesignerView('dashboard')
   }
 
@@ -303,7 +313,11 @@ function App() {
           </div>
 
           {designerView === 'dashboard' && activeDesigner ? <div className="designer-dashboard">
-            <div className="designer-profile-summary"><div className="designer-avatar">{activeDesigner.name.charAt(0)}</div><div><span className="eyebrow">{activeDesigner.brand}</span><h3>{activeDesigner.name}</h3><p>{activeDesigner.municipality}, {activeDesigner.country} · {activeDesigner.email} · {activeDesigner.phone}</p></div><button className="designer-logout" onClick={() => { setActiveDesigner(null); setDesignerView('login') }}>Cerrar sesión</button></div>
+            <div className="designer-profile-summary"><div className="designer-avatar">{activeDesigner.name.charAt(0)}</div><div><span className="eyebrow">{activeDesigner.brand}</span><h3>{activeDesigner.name}</h3><p>{activeDesigner.municipality}, {activeDesigner.country} · {activeDesigner.email} · {activeDesigner.phone}</p></div><button className="designer-notification-button" aria-label={`Ver ${activeDesigner.notifications?.length ?? 0} notificaciones`} aria-expanded={designerNotificationsOpen} aria-controls="designer-notifications" onClick={() => setDesignerNotificationsOpen((isOpen) => !isOpen)}><Icon name="bell" size={20} />{(activeDesigner.notifications?.length ?? 0) > 0 && <span>{activeDesigner.notifications.length}</span>}</button><button className="designer-logout" onClick={() => { setActiveDesigner(null); setDesignerNotificationsOpen(false); setDesignerView('login') }}>Cerrar sesión</button></div>
+            {designerNotificationsOpen && <section className="designer-notification-panel" id="designer-notifications" aria-label="Notificaciones de interés en tus diseños"><div className="designer-notification-heading"><div><span className="eyebrow">ACTIVIDAD DE TU COLECCIÓN</span><h3>Personas interesadas</h3></div><span className="designer-notification-total">{activeDesigner.notifications?.length ?? 0}</span></div>{activeDesigner.notifications?.length ? <><ul>{activeDesigner.notifications.map((notification) => {
+              const product = activeDesigner.collection.find((item) => item.id === notification.productId)
+              return <li className="designer-notification-item" key={notification.id}><span className="designer-notification-avatar">{notification.person.split(' ').map((part) => part[0]).slice(0, 2).join('')}</span><p><strong>{notification.person}</strong> · {notification.municipality}<br /><span>Está interesada en <b>{product?.name ?? 'uno de tus diseños'}</b></span></p><time>{notification.when}</time></li>
+            })}</ul><p className="designer-notification-disclaimer">Notificaciones de ejemplo con datos simulados.</p></> : <p className="designer-notification-empty">Todavía no hay personas interesadas en tus diseños.</p>}</section>}
             <div className="designer-dashboard-heading"><div><span className="eyebrow">TU ESPACIO</span><h3>Mi colección <span>{activeDesigner.collection.length}</span></h3></div><p>Esta es la colección asociada a tu cuenta de diseñadora.</p></div>
             {activeDesigner.collection.length > 0 ? <div className="designer-collection-grid">{activeDesigner.collection.map((product) => <article className="designer-piece" key={product.id}><img src={product.image} alt={product.name} /><div><span>{product.category}</span><h4>{product.name}</h4></div></article>)}</div> : <div className="designer-empty-collection"><span>✳</span><h3>Tu colección está lista para comenzar.</h3><p>Las piezas que agregues a tu cuenta aparecerán aquí. Por ahora, este espacio funciona como una demostración visual.</p></div>}
           </div> : designerView === 'register' ? <form className="designer-form" onSubmit={registerDesigner}>
@@ -329,7 +343,6 @@ function App() {
               <button className="button button-dark designer-submit" type="submit">Ingresar a mi colección <Icon name="arrow" size={16} /></button>
               <p className="designer-form-switch">¿Aún no tienes cuenta? <button type="button" onClick={() => { setDesignerError(''); setDesignerView('register') }}>Regístrate como diseñador</button></p>
             </form>
-            <aside className="designer-demo-account"><span className="eyebrow">CUENTA DE DEMOSTRACIÓN</span><h3>Prueba el espacio de diseñadora</h3><p>Entra con esta cuenta hardcodeada para ver una colección de ejemplo.</p><dl><div><dt>Correo</dt><dd>disenadora@vestigios.co</dd></div><div><dt>Contraseña</dt><dd>Vestigios2025!</dd></div></dl><button className="button button-outline" onClick={() => { setActiveDesigner(demoDesignerAccount); setDesignerError(''); setDesignerView('dashboard') }}>Entrar a la cuenta demo <Icon name="arrow" size={16} /></button></aside>
           </div>}
         </section>
       </div>}
